@@ -1,7 +1,5 @@
-package com.budgetplanner.repository;
+package com.budgetplanner;
 
-import com.budgetplanner.model.Transaction;
-import com.budgetplanner.model.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -9,14 +7,17 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
-public interface TransactionRepository extends JpaRepository<Transaction, Long> {
+interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByEmail(String email);
+    boolean existsByEmail(String email);
+}
 
+@Repository
+interface TransactionRepository extends JpaRepository<Transaction, Long> {
     List<Transaction> findByUserIdOrderByOccurredOnDescCreatedAtDesc(Long userId);
-
-    List<Transaction> findByUserIdAndOccurredOnBetweenOrderByOccurredOnDescCreatedAtDesc(
-            Long userId, LocalDate startDate, LocalDate endDate);
 
     @Query("SELECT t FROM Transaction t WHERE t.userId = :userId " +
            "AND (:type IS NULL OR t.type = :type) " +
@@ -35,4 +36,14 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate,
             @Param("keyword") String keyword);
+}
+
+@Repository
+interface BudgetRepository extends JpaRepository<Budget, Long> {
+    Optional<Budget> findByUserIdAndMonth(Long userId, String month);
+}
+
+@Repository
+interface SavingsGoalRepository extends JpaRepository<SavingsGoal, Long> {
+    Optional<SavingsGoal> findByUserId(Long userId);
 }
