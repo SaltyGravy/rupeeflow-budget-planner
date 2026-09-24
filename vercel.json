@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "name": "rupeeflow-budget-planner",
+  "outputDirectory": "src/main/resources/static",
+  "cleanUrls": true,
+  "trailingSlash": false
+}

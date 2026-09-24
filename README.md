@@ -1,0 +1,146 @@
+# 💰 RupeeFlow — Personal Finance & Budget Planner
+
+A responsive personal finance and budget planner application built **strictly with a Java backend (Spring Boot)** and a **pure HTML5 + CSS3 frontend**.
+
+🌐 **Live Vercel URL**: [https://rupeeflow-budget-planner.vercel.app](https://rupeeflow-budget-planner.vercel.app)
+
+---
+
+## 🚀 Key Features
+
+1. **User Registration & Login & Logout**
+   - User account creation with full name, email, and password.
+   - Secure password hashing using **BCrypt** (`spring-security-crypto`).
+   - Session-based user isolation via HTTP session.
+   - Ready-to-use **Demo Account** (`demo@rupeeflow.com` / `password123`).
+
+2. **Dashboard**
+   - **Remaining Balance** (`Total Income - Total Expenses`).
+   - **Total Income & Total Expenses** summary cards.
+   - **Savings Tracker** (`Max(0, Income - Expense)`).
+   - **Income vs Expense 6-Month Comparison** (Bar chart).
+   - **Spending by Category Breakdown** (Donut chart).
+   - **Monthly Budget Tracking** progress bar.
+   - **Recent Transactions** quick list.
+   - Quick action to add income or expense.
+
+3. **Transaction Management (Add, Edit, Delete, Filter)**
+   - **Income Categories**: Salary, Pocket money, Freelancing, Other income.
+   - **Expense Categories**: Food, Travel, Shopping, Education, Bills, Entertainment, Other.
+   - Filter by **Type** (All / Income / Expense).
+   - Filter by **Category**.
+   - Filter by **Date Range** (From / To).
+   - Live **Search** across descriptions, categories, and amounts.
+   - Edit and delete any existing transaction.
+
+4. **Monthly Budget Setting & 80% Expense Alert**
+   - Set custom monthly budget limits (e.g., ₹35,000).
+   - Dynamic animated progress bar tracking budget utilization.
+   - **Automatic Expense Alert**: triggers when spending reaches or exceeds **80%** of the monthly budget:
+     > `⚠️ You have used 80% of your monthly budget. (₹X remaining)`
+   - Danger warning if budget exceeds 100%.
+
+5. **Savings Goals**
+   - Define custom savings target (e.g., ₹100,000 for emergency fund / electronics).
+   - Visual progress bar towards achieving the goal based on cumulative savings.
+
+6. **Monthly Financial Report**
+   - Month-by-month historical selector.
+   - Key monthly summary metrics: Income, Expense, Savings, Balance, Highest Spending Category, Budget status.
+   - **12-Month Spending Trend** area chart.
+
+---
+
+## 🛠 Tech Stack
+
+- **Backend**: **STRICTLY JAVA**
+  - **Framework**: Java 21 / 25 / 27 + **Spring Boot 3.3.4**
+  - **Modules**: Spring Web, Spring Data JPA, Hibernate, Jakarta Validation
+  - **Security**: BCrypt password hashing + Session Interceptor
+  - **Database**: H2 Persistent File Database (`./data/budgetplanner`) by default (zero setup), with ready-to-enable MySQL configuration.
+- **Frontend**: **STRICTLY HTML & CSS**
+  - Semantic **HTML5** (`src/main/resources/static/index.html`)
+  - Modern **CSS3** (`src/main/resources/static/css/style.css`) with "Kinetic Glass" dark-theme design, aurora glowing effects, and responsive layout.
+  - Vanilla **JavaScript** (`src/main/resources/static/js/app.js`) for API requests, modals, and dynamic rendering.
+  - Embedded **Chart.js** for interactive data visualization.
+
+---
+
+## 🏃 Running the Application
+
+### Prerequisites
+- Java 21 or higher installed (`java -version`)
+- Maven 3.9+ (`mvn -version`)
+
+### Quick Start
+
+1. **Build the application**:
+   ```bash
+   mvn clean package -DskipTests
+   ```
+
+2. **Run the JAR**:
+   ```bash
+   java -jar target/budget-planner-1.0.0.jar
+   ```
+   *Or directly run with Maven:*
+   ```bash
+   mvn spring-boot:run
+   ```
+
+3. **Open in Browser**:
+   ```
+   http://localhost:8080/
+   ```
+
+4. **Log In**:
+   - Click **"⚡ Explore Demo Account (Aarav Kumar)"** for instant exploration with pre-populated transactions.
+   - Or click **"Create Account"** to sign up with a new email.
+
+---
+
+## 🔌 Switching from H2 to MySQL (Optional)
+
+In [`src/main/resources/application.properties`](src/main/resources/application.properties), uncomment the MySQL lines and provide your database credentials:
+
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3306/budget_planner?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+spring.datasource.username=root
+spring.datasource.password=your_password
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
+```
+
+---
+
+## 📁 Project Architecture
+
+```
+budget-planner/
+├── pom.xml
+├── README.md
+├── src/main/
+│   ├── java/com/budgetplanner/
+│   │   ├── BudgetPlannerApplication.java   # Main entry point
+│   │   ├── config/
+│   │   │   ├── AuthInterceptor.java        # Session auth guard
+│   │   │   ├── DemoDataLoader.java         # Initial seed data
+│   │   │   └── WebMvcConfig.java           # Routing & static resources
+│   │   ├── controller/
+│   │   │   ├── AuthController.java         # /api/auth/*
+│   │   │   ├── TransactionController.java  # /api/transactions/*
+│   │   │   ├── BudgetController.java       # /api/budgets/*
+│   │   │   ├── SavingsGoalController.java  # /api/savings-goals/*
+│   │   │   ├── DashboardController.java    # /api/dashboard/*
+│   │   │   └── ReportController.java       # /api/reports/*
+│   │   ├── model/                          # JPA Entities
+│   │   ├── repository/                     # Spring Data Repositories
+│   │   ├── service/                        # Business logic & analytics
+│   │   └── dto/                            # Data Transfer Objects
+│   └── resources/
+│       ├── application.properties          # Server & DB configs
+│       └── static/                         # STRICT HTML & CSS FRONTEND
+│           ├── index.html                  # HTML5 SPA
+│           ├── css/style.css               # Kinetic Glass CSS3 styling
+│           └── js/app.js                   # Client interactivity & Chart.js
+```
