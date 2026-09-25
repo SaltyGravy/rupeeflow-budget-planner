@@ -454,73 +454,42 @@ class BudgetPlannerService {
 
         List<Transaction> all = txRepo.findByUserIdOrderByOccurredOnDesc(userId);
 
-        // Step 1: Calculate income & expense for THIS selected month
-        double monthIncome = 0;
-        double monthExpense = 0;
+        // Step 1: Filter transactions for THIS month
         List<Transaction> monthTransactions = new ArrayList<>();
-
         for (Transaction t : all) {
             if (YearMonth.from(t.getOccurredOn()).equals(targetMonth)) {
                 monthTransactions.add(t);
-                if (t.isIncome()) {
-                    monthIncome += t.getAmount();
-                } else if (t.isExpense()) {
-                    monthExpense += t.getAmount();
-                }
             }
         }
 
-        double remainingBalance = monthIncome - monthExpense;
-        double savingsThisMonth = Math.max(remainingBalance, 0);
+        // Calculations delegated to BudgetCalculator (simple, beginner-friendly methods)
+        double monthIncome = BudgetCalculator.calculateTotalIncome(monthTransactions);
+        double monthExpense = BudgetCalculator.calculateTotalExpense(monthTransactions);
+        double remainingBalance = BudgetCalculator.calculateBalance(monthIncome, monthExpense);
+        double savingsThisMonth = BudgetCalculator.calculateSavings(monthIncome, monthExpense);
 
-        // Step 2: Calculate all-time cumulative savings across all months
-        double allIncome = 0;
-        double allExpense = 0;
-        for (Transaction t : all) {
-            if (t.isIncome()) allIncome += t.getAmount();
-            if (t.isExpense()) allExpense += t.getAmount();
-        }
-        double totalSavingsAllTime = Math.max(allIncome - allExpense, 0);
+        // Step 2: All-time cumulative savings
+        double allIncome = BudgetCalculator.calculateTotalIncome(all);
+        double allExpense = BudgetCalculator.calculateTotalExpense(all);
+        double totalSavingsAllTime = BudgetCalculator.calculateSavings(allIncome, allExpense);
 
-        // Step 3: Check monthly budget and 80% spending alert
+        // Step 3: Monthly budget & 80% spending alert
         Budget budget = getBudget(userId, monthKey);
         double monthlyBudget = budget.getAmount();
-        double budgetRemaining = Math.max(monthlyBudget - monthExpense, 0);
-        double budgetUsedPercent = monthlyBudget > 0 ? (monthExpense / monthlyBudget) * 100 : 0;
-
-        // Triggers alert if 80% or more of the budget is spent
-        boolean budgetAlert = monthlyBudget > 0 && budgetUsedPercent >= 80.0;
-        String budgetAlertMessage = budgetAlert
-                ? String.format("You have used %.0f%% of your monthly budget. ₹%.0f remaining.", budgetUsedPercent, budgetRemaining)
-                : "";
+        double budgetRemaining = BudgetCalculator.calculateBudgetRemaining(monthlyBudget, monthExpense);
+        double budgetUsedPercent = BudgetCalculator.calculateBudgetUsedPercentage(monthlyBudget, monthExpense);
+        boolean budgetAlert = BudgetCalculator.isBudgetAlert(monthlyBudget, monthExpense);
+        String budgetAlertMessage = BudgetCalculator.getBudgetAlertMessage(monthlyBudget, monthExpense);
 
         // Step 4: Savings goal progress percentage
         SavingsGoal goal = getSavingsGoal(userId);
-        double goalPercent = goal.getTargetAmount() > 0
-                ? Math.min(100.0, (totalSavingsAllTime / goal.getTargetAmount()) * 100) : 0;
+        double goalPercent = BudgetCalculator.calculateSavingsGoalPercentage(totalSavingsAllTime, goal.getTargetAmount());
 
-        // Step 5: Category breakdown (Food, Travel, Bills, etc.)
-        List<Map<String, Object>> categoryBreakdown = computeCategories(monthTransactions, monthExpense);
+        // Step 5: Category breakdown (Food, Shopping, Bills, etc.)
+        List<Map<String, Object>> categoryBreakdown = BudgetCalculator.calculateCategoryBreakdown(monthTransactions, monthExpense);
 
         // Step 6: 6-Month Income vs Expense trend for chart
-        List<Map<String, Object>> sixMonthTrend = new ArrayList<>();
-        for (int i = 5; i >= 0; i--) {
-            YearMonth ym = targetMonth.minusMonths(i);
-            double inc = 0;
-            double exp = 0;
-            for (Transaction t : all) {
-                if (YearMonth.from(t.getOccurredOn()).equals(ym)) {
-                    if (t.isIncome()) inc += t.getAmount();
-                    if (t.isExpense()) exp += t.getAmount();
-                }
-            }
-            sixMonthTrend.add(Map.of(
-                    "month", ym.toString(),
-                    "monthLabel", ym.format(DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)),
-                    "income", inc,
-                    "expense", exp
-            ));
-        }
+        List<Map<String, Object>> sixMonthTrend = BudgetCalculator.calculateMonthlyTrend(all, targetMonth, 6);
 
         // Top 5 recent transactions
         List<Transaction> recent = all.size() > 5 ? all.subList(0, 5) : all;
@@ -560,28 +529,25 @@ class BudgetPlannerService {
 
         List<Transaction> all = txRepo.findByUserIdOrderByOccurredOnDesc(userId);
 
-        double totalIncome = 0;
-        double totalExpense = 0;
         List<Transaction> monthTransactions = new ArrayList<>();
-
         for (Transaction t : all) {
             if (YearMonth.from(t.getOccurredOn()).equals(targetMonth)) {
                 monthTransactions.add(t);
-                if (t.isIncome()) totalIncome += t.getAmount();
-                if (t.isExpense()) totalExpense += t.getAmount();
             }
         }
 
-        double balance = totalIncome - totalExpense;
-        double savings = Math.max(balance, 0);
+        double totalIncome = BudgetCalculator.calculateTotalIncome(monthTransactions);
+        double totalExpense = BudgetCalculator.calculateTotalExpense(monthTransactions);
+        double balance = BudgetCalculator.calculateBalance(totalIncome, totalExpense);
+        double savings = BudgetCalculator.calculateSavings(totalIncome, totalExpense);
 
-        List<Map<String, Object>> categories = computeCategories(monthTransactions, totalExpense);
+        List<Map<String, Object>> categories = BudgetCalculator.calculateCategoryBreakdown(monthTransactions, totalExpense);
         String highestCategory = categories.isEmpty() ? "—" : (String) categories.get(0).get("category");
         double highestAmount = categories.isEmpty() ? 0 : (double) categories.get(0).get("amount");
 
         Budget budget = getBudget(userId, monthKey);
         double budgetAmount = budget.getAmount();
-        double budgetRemaining = Math.max(budgetAmount - totalExpense, 0);
+        double budgetRemaining = BudgetCalculator.calculateBudgetRemaining(budgetAmount, totalExpense);
 
         // 12-month spending trend for line chart
         List<Map<String, Object>> twelveMonthTrend = new ArrayList<>();
@@ -619,30 +585,6 @@ class BudgetPlannerService {
         report.put("twelveMonthTrend", twelveMonthTrend);
         report.put("availableMonths", availableMonths);
         return report;
-    }
-
-    // Helper: Calculate spending per category and percentage
-    private List<Map<String, Object>> computeCategories(List<Transaction> transactions, double totalExpense) {
-        Map<String, Double> map = new HashMap<>();
-        for (Transaction t : transactions) {
-            if (t.isExpense()) {
-                map.put(t.getCategory(), map.getOrDefault(t.getCategory(), 0.0) + t.getAmount());
-            }
-        }
-
-        List<Map.Entry<String, Double>> list = new ArrayList<>(map.entrySet());
-        list.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
-
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Map.Entry<String, Double> entry : list) {
-            double percent = totalExpense > 0 ? (entry.getValue() / totalExpense) * 100 : 0;
-            result.add(Map.of(
-                    "category", entry.getKey(),
-                    "amount", entry.getValue(),
-                    "percentage", percent
-            ));
-        }
-        return result;
     }
 
     private YearMonth parseMonth(String str) {
