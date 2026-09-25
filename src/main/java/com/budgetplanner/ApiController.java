@@ -6,12 +6,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Single, clean REST Controller routing frontend requests to the service layer.
+ */
 @RestController
 @RequestMapping("/api")
 public class ApiController {
@@ -22,15 +24,20 @@ public class ApiController {
         this.service = service;
     }
 
-    // --- Authentication ---
+    // ===================================================================
+    // 1. AUTHENTICATION ENDPOINTS
+    // ===================================================================
+
     @PostMapping("/auth/register")
     public ResponseEntity<?> register(@RequestBody Map<String, String> body, HttpSession session) {
         String name = body.get("fullName");
         String email = body.get("email");
         String password = body.get("password");
+
         if (name == null || email == null || password == null || password.length() < 6) {
             return ResponseEntity.badRequest().body(Map.of("error", "Name, email and password (min 6 chars) are required."));
         }
+
         Map<String, Object> user = service.register(name, email, password);
         session.setAttribute(AppConfig.SESSION_USER_KEY, user.get("id"));
         return ResponseEntity.status(HttpStatus.CREATED).body(user);
@@ -40,9 +47,11 @@ public class ApiController {
     public ResponseEntity<?> login(@RequestBody Map<String, String> body, HttpSession session) {
         String email = body.get("email");
         String password = body.get("password");
+
         if (email == null || password == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email and password are required."));
         }
+
         User user = service.authenticate(email, password);
         session.setAttribute(AppConfig.SESSION_USER_KEY, user.getId());
         return ResponseEntity.ok(Map.of("id", user.getId(), "email", user.getEmail(), "fullName", user.getFullName()));
@@ -55,7 +64,7 @@ public class ApiController {
     }
 
     @GetMapping("/auth/me")
-    public ResponseEntity<?> me(HttpSession session) {
+    public ResponseEntity<?> getCurrentUser(HttpSession session) {
         Long userId = (Long) session.getAttribute(AppConfig.SESSION_USER_KEY);
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("authenticated", false));
@@ -63,7 +72,10 @@ public class ApiController {
         return ResponseEntity.ok(service.getUserById(userId));
     }
 
-    // --- Transactions ---
+    // ===================================================================
+    // 2. TRANSACTION ENDPOINTS (CRUD & FILTERS)
+    // ===================================================================
+
     @GetMapping("/transactions")
     public ResponseEntity<?> getTransactions(
             @RequestParam(required = false) TransactionType type,
@@ -82,7 +94,7 @@ public class ApiController {
         Long userId = (Long) session.getAttribute(AppConfig.SESSION_USER_KEY);
         TransactionType type = TransactionType.valueOf((String) body.get("type"));
         String category = (String) body.get("category");
-        BigDecimal amount = new BigDecimal(body.get("amount").toString());
+        double amount = Double.parseDouble(body.get("amount").toString());
         LocalDate date = LocalDate.parse((String) body.get("occurredOn"));
         String desc = (String) body.get("description");
 
@@ -95,7 +107,7 @@ public class ApiController {
         Long userId = (Long) session.getAttribute(AppConfig.SESSION_USER_KEY);
         TransactionType type = TransactionType.valueOf((String) body.get("type"));
         String category = (String) body.get("category");
-        BigDecimal amount = new BigDecimal(body.get("amount").toString());
+        double amount = Double.parseDouble(body.get("amount").toString());
         LocalDate date = LocalDate.parse((String) body.get("occurredOn"));
         String desc = (String) body.get("description");
 
@@ -110,43 +122,47 @@ public class ApiController {
         return ResponseEntity.ok(Map.of("message", "Transaction deleted successfully"));
     }
 
-    // --- Budget ---
+    // ===================================================================
+    // 3. BUDGET & SAVINGS GOAL ENDPOINTS
+    // ===================================================================
+
     @GetMapping("/budgets/current")
     public ResponseEntity<?> getCurrentBudget(@RequestParam(required = false) String month, HttpSession session) {
         Long userId = (Long) session.getAttribute(AppConfig.SESSION_USER_KEY);
         String target = (month != null && !month.isBlank()) ? month.trim() : YearMonth.now().toString();
-        BigDecimal amount = service.getBudget(userId, target).map(Budget::getAmount).orElse(BigDecimal.ZERO);
-        return ResponseEntity.ok(Map.of("month", target, "amount", amount));
+        Budget budget = service.getBudget(userId, target);
+        return ResponseEntity.ok(Map.of("month", target, "amount", budget.getAmount()));
     }
 
     @PostMapping("/budgets")
     public ResponseEntity<?> setBudget(@RequestBody Map<String, Object> body, HttpSession session) {
         Long userId = (Long) session.getAttribute(AppConfig.SESSION_USER_KEY);
         String month = (String) body.get("month");
-        BigDecimal amount = new BigDecimal(body.get("amount").toString());
+        double amount = Double.parseDouble(body.get("amount").toString());
         Budget saved = service.setBudget(userId, month, amount);
         return ResponseEntity.ok(Map.of("month", saved.getMonth(), "amount", saved.getAmount()));
     }
 
-    // --- Savings Goal ---
     @GetMapping("/savings-goals")
     public ResponseEntity<?> getSavingsGoal(HttpSession session) {
         Long userId = (Long) session.getAttribute(AppConfig.SESSION_USER_KEY);
-        return ResponseEntity.ok(service.getSavingsGoal(userId)
-                .map(g -> Map.of("title", g.getTitle(), "targetAmount", g.getTargetAmount()))
-                .orElse(Map.of("title", "Savings goal", "targetAmount", BigDecimal.ZERO)));
+        SavingsGoal goal = service.getSavingsGoal(userId);
+        return ResponseEntity.ok(Map.of("title", goal.getTitle(), "targetAmount", goal.getTargetAmount()));
     }
 
     @PostMapping("/savings-goals")
     public ResponseEntity<?> setSavingsGoal(@RequestBody Map<String, Object> body, HttpSession session) {
         Long userId = (Long) session.getAttribute(AppConfig.SESSION_USER_KEY);
         String title = (String) body.get("title");
-        BigDecimal amount = new BigDecimal(body.get("targetAmount").toString());
+        double amount = Double.parseDouble(body.get("targetAmount").toString());
         SavingsGoal saved = service.setSavingsGoal(userId, title, amount);
         return ResponseEntity.ok(Map.of("title", saved.getTitle(), "targetAmount", saved.getTargetAmount()));
     }
 
-    // --- Dashboard & Reports ---
+    // ===================================================================
+    // 4. DASHBOARD & REPORT ANALYTICS
+    // ===================================================================
+
     @GetMapping("/dashboard/stats")
     public ResponseEntity<?> getDashboardStats(@RequestParam(required = false) String month, HttpSession session) {
         Long userId = (Long) session.getAttribute(AppConfig.SESSION_USER_KEY);
@@ -159,20 +175,23 @@ public class ApiController {
         return ResponseEntity.ok(service.getMonthlyReport(userId, month));
     }
 
-    // --- Global Error Handler ---
+    // ===================================================================
+    // 5. ERROR HANDLING
+    // ===================================================================
+
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException ex) {
+    public ResponseEntity<Map<String, String>> handleBadInput(IllegalArgumentException ex) {
         return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
     }
 
     @ExceptionHandler(SecurityException.class)
-    public ResponseEntity<Map<String, String>> handleSecurity(SecurityException ex) {
+    public ResponseEntity<Map<String, String>> handleUnauthorized(SecurityException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleGeneral(Exception ex) {
+    public ResponseEntity<Map<String, String>> handleUnexpected(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", ex.getMessage() != null ? ex.getMessage() : "Unexpected server error"));
+                .body(Map.of("error", ex.getMessage() != null ? ex.getMessage() : "Unexpected error"));
     }
 }

@@ -1,7 +1,6 @@
 package com.budgetplanner;
 
 import jakarta.persistence.*;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -10,6 +9,9 @@ enum TransactionType {
     EXPENSE
 }
 
+/**
+ * User Account Entity
+ */
 @Entity
 @Table(name = "users")
 class User {
@@ -17,16 +19,15 @@ class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, unique = true)
     private String email;
 
     @Column(nullable = false)
     private String password;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false)
     private String fullName;
 
-    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public User() {}
@@ -35,7 +36,6 @@ class User {
         this.email = email;
         this.password = password;
         this.fullName = fullName;
-        this.createdAt = LocalDateTime.now();
     }
 
     public Long getId() { return id; }
@@ -47,50 +47,46 @@ class User {
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
 
+/**
+ * Income / Expense Transaction Entity
+ */
 @Entity
-@Table(name = "transactions", indexes = {
-    @Index(name = "idx_tx_user_date", columnList = "user_id, occurred_on")
-})
+@Table(name = "transactions")
 class Transaction {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(nullable = false)
     private Long userId;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
-    private TransactionType type;
+    @Column(nullable = false)
+    private TransactionType type; // INCOME or EXPENSE
 
-    @Column(nullable = false, length = 50)
-    private String category;
+    @Column(nullable = false)
+    private String category;      // Food, Travel, Salary, etc.
 
-    @Column(nullable = false, precision = 14, scale = 2)
-    private BigDecimal amount;
+    @Column(nullable = false)
+    private double amount;        // Transaction amount in Rupees
 
-    @Column(name = "occurred_on", nullable = false)
-    private LocalDate occurredOn;
+    @Column(nullable = false)
+    private LocalDate occurredOn; // Date of transaction
 
-    @Column(length = 255)
     private String description;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public Transaction() {}
 
-    public Transaction(Long userId, TransactionType type, String category, BigDecimal amount, LocalDate occurredOn, String description) {
+    public Transaction(Long userId, TransactionType type, String category, double amount, LocalDate occurredOn, String description) {
         this.userId = userId;
         this.type = type;
         this.category = category;
         this.amount = amount;
         this.occurredOn = occurredOn;
         this.description = description;
-        this.createdAt = LocalDateTime.now();
     }
 
     public Long getId() { return id; }
@@ -101,44 +97,43 @@ class Transaction {
     public void setType(TransactionType type) { this.type = type; }
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
-    public BigDecimal getAmount() { return amount; }
-    public void setAmount(BigDecimal amount) { this.amount = amount; }
+    public double getAmount() { return amount; }
+    public void setAmount(double amount) { this.amount = amount; }
     public LocalDate getOccurredOn() { return occurredOn; }
     public void setOccurredOn(LocalDate occurredOn) { this.occurredOn = occurredOn; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public boolean isIncome() { return type == TransactionType.INCOME; }
+    public boolean isExpense() { return type == TransactionType.EXPENSE; }
 }
 
+/**
+ * Monthly Budget Limit Entity
+ */
 @Entity
-@Table(name = "budgets", uniqueConstraints = {
-    @UniqueConstraint(name = "uk_user_month", columnNames = {"user_id", "budget_month"})
-})
+@Table(name = "budgets")
 class Budget {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(nullable = false)
     private Long userId;
 
-    @Column(name = "budget_month", nullable = false, length = 7)
-    private String month;
+    @Column(name = "budget_month", nullable = false)
+    private String month; // format: "YYYY-MM"
 
-    @Column(nullable = false, precision = 14, scale = 2)
-    private BigDecimal amount;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(nullable = false)
+    private double amount; // Budget limit in Rupees
 
     public Budget() {}
 
-    public Budget(Long userId, String month, BigDecimal amount) {
+    public Budget(Long userId, String month, double amount) {
         this.userId = userId;
         this.month = month;
         this.amount = amount;
-        this.createdAt = LocalDateTime.now();
     }
 
     public Long getId() { return id; }
@@ -147,40 +142,35 @@ class Budget {
     public void setUserId(Long userId) { this.userId = userId; }
     public String getMonth() { return month; }
     public void setMonth(String month) { this.month = month; }
-    public BigDecimal getAmount() { return amount; }
-    public void setAmount(BigDecimal amount) { this.amount = amount; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public double getAmount() { return amount; }
+    public void setAmount(double amount) { this.amount = amount; }
 }
 
+/**
+ * Savings Goal Entity
+ */
 @Entity
-@Table(name = "savings_goals", uniqueConstraints = {
-    @UniqueConstraint(name = "uk_user_goal", columnNames = {"user_id"})
-})
+@Table(name = "savings_goals")
 class SavingsGoal {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(nullable = false)
     private Long userId;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false)
     private String title = "Savings goal";
 
-    @Column(name = "target_amount", nullable = false, precision = 14, scale = 2)
-    private BigDecimal targetAmount;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(nullable = false)
+    private double targetAmount; // Goal amount in Rupees
 
     public SavingsGoal() {}
 
-    public SavingsGoal(Long userId, String title, BigDecimal targetAmount) {
+    public SavingsGoal(Long userId, String title, double targetAmount) {
         this.userId = userId;
         this.title = title;
         this.targetAmount = targetAmount;
-        this.createdAt = LocalDateTime.now();
     }
 
     public Long getId() { return id; }
@@ -189,8 +179,6 @@ class SavingsGoal {
     public void setUserId(Long userId) { this.userId = userId; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
-    public BigDecimal getTargetAmount() { return targetAmount; }
-    public void setTargetAmount(BigDecimal targetAmount) { this.targetAmount = targetAmount; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public double getTargetAmount() { return targetAmount; }
+    public void setTargetAmount(double targetAmount) { this.targetAmount = targetAmount; }
 }
