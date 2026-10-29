@@ -35,3 +35,19 @@ data/
 *.log
 .vercel
 .env*
+
+### Secrets & API keys — never commit these ###
+.env
+.env.*
+*.env
+secrets.properties
+application-local.properties
+application-secrets.properties
+src/main/resources/application-local.properties
+src/main/resources/application-secrets.properties
+*.pem
+*.key
+*.p12
+*.jks
+credentials.json
+service-account*.json
