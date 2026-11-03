@@ -1,0 +1,23 @@
+# Never upload these to a Vercel deployment.
+# The live site is a static build served from src/main/resources/static.
+
+# Local H2 database (contains user records & password hashes)
+data/
+*.db
+*.mv.db
+*.trace.db
+
+# Maven build output
+target/
+
+# Editor & OS cruft
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# Secrets (also covered by .gitignore)
+.env
+.env.*
+*.pem
+*.key
