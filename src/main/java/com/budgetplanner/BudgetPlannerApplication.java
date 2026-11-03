@@ -821,10 +821,22 @@ class AuthInterceptor implements HandlerInterceptor {
 }
 
 /**
- * Automatically creates a sample Demo Account (Aarav Kumar) on first run.
+ * Automatically creates the sample Demo Account (Aarav Kumar) with facade data.
+ *
+ * All the numbers below are made-up placeholder values used only to make the
+ * dashboard, charts and reports look realistic when someone tries the demo.
+ *
+ * Two rules keep the demo believable:
+ *   1. Nothing is ever dated in the future (you cannot spend money tomorrow).
+ *   2. Every month has slightly different values, so the 6-month chart is not flat.
  */
 @Component
 class DemoDataLoader implements CommandLineRunner {
+
+    // The demo login shown on the sign-in screen
+    private static final String DEMO_EMAIL = "demo@rupeeflow.com";
+    private static final String DEMO_PASSWORD = "password123";
+    private static final String DEMO_NAME = "Aarav Kumar";
 
     private final UserRepository userRepo;
     private final TransactionRepository txRepo;
@@ -842,41 +854,120 @@ class DemoDataLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        // If data already exists, do not recreate
-        if (userRepo.count() > 0) return;
+        // Create the demo account only if it is missing.
+        // Accounts registered by real people are never touched.
+        if (userRepo.existsByEmail(DEMO_EMAIL)) return;
 
-        // 1. Create Demo User
-        User demo = userRepo.save(new User("demo@rupeeflow.com", passwordEncoder.encode("password123"), "Aarav Kumar"));
+        User demo = userRepo.save(new User(DEMO_EMAIL, passwordEncoder.encode(DEMO_PASSWORD), DEMO_NAME));
         Long userId = demo.getId();
 
         LocalDate today = LocalDate.now();
         YearMonth thisMonth = YearMonth.from(today);
-        String monthKey = thisMonth.toString();
 
-        // 2. Set Monthly Budget (₹35,000) and Savings Goal (₹100,000)
-        budgetRepo.save(new Budget(userId, monthKey, 35000.0));
-        goalRepo.save(new SavingsGoal(userId, "Emergency Fund & Laptop", 100000.0));
+        // ====================================================================
+        // 1. SAVINGS GOAL
+        // ====================================================================
+        // Target is kept well above the demo's saved-up amount so the progress
+        // bar shows real partial progress (~65%) instead of sitting at 100%.
+        goalRepo.save(new SavingsGoal(userId, "Emergency Fund & MacBook", 500000.0));
 
-        // 3. Add Sample Transactions for This Month
-        txRepo.save(new Transaction(userId, TransactionType.INCOME, "Salary", 75000.0, thisMonth.atDay(1), "Tech Corp Monthly Salary"));
-        txRepo.save(new Transaction(userId, TransactionType.INCOME, "Freelancing", 15000.0, thisMonth.atDay(5), "Web Development Project"));
-        txRepo.save(new Transaction(userId, TransactionType.EXPENSE, "Food", 6800.0, thisMonth.atDay(3), "Groceries & Supermarket"));
-        txRepo.save(new Transaction(userId, TransactionType.EXPENSE, "Bills", 4500.0, thisMonth.atDay(4), "Electricity & High-speed Wifi"));
-        txRepo.save(new Transaction(userId, TransactionType.EXPENSE, "Shopping", 8200.0, thisMonth.atDay(8), "Clothing & Home Essentials"));
-        txRepo.save(new Transaction(userId, TransactionType.EXPENSE, "Travel", 3400.0, thisMonth.atDay(11), "Fuel & Metro Card"));
-        txRepo.save(new Transaction(userId, TransactionType.EXPENSE, "Entertainment", 2500.0, thisMonth.atDay(14), "Movies & Dinner with Friends"));
-        txRepo.save(new Transaction(userId, TransactionType.EXPENSE, "Food", 3200.0, thisMonth.atDay(18), "Weekend Cafe & Dining"));
-        txRepo.save(new Transaction(userId, TransactionType.EXPENSE, "Education", 2900.0, thisMonth.atDay(20), "Online Courses & Books"));
+        // ====================================================================
+        // 2. FIVE PAST MONTHS (gives the 6-month chart a varied history)
+        // ====================================================================
+        // Each row is one month. Column order:
+        // salary, extraIncome, food, bills, travel, shopping, fun, education, misc, budget
+        double[][] pastMonths = {
+            { 72000, 2000,  7200, 4100, 2800, 5400, 2100, 1800,  900, 38000 }, // 5 months ago - steady
+            { 72000, 8000,  8100, 4600, 3300, 7200, 3100, 2400,    0, 38000 }, // 4 months ago - freelance project
+            { 75000,    0,  6900, 5200, 2600, 4100, 1900,    0, 1200, 40000 }, // 3 months ago - quiet month
+            { 75000, 15500, 7800, 4300, 4100, 9600, 3600, 2000,    0, 35000 }, // 2 months ago - festival overspend (fires the 80% alert)
+            { 78000, 1500,  7400, 4400, 2900, 5100, 2300, 2600, 1100, 42000 }  // last month    - back to normal
+        };
 
-        // 4. Add Historical Transactions (Previous 5 Months for 6-Month charts)
-        for (int i = 1; i <= 5; i++) {
-            YearMonth pastMonth = thisMonth.minusMonths(i);
-            txRepo.save(new Transaction(userId, TransactionType.INCOME, "Salary", 72000.0, pastMonth.atDay(1), "Monthly Salary"));
-            txRepo.save(new Transaction(userId, TransactionType.EXPENSE, "Food", 7500.0, pastMonth.atDay(4), "Groceries"));
-            txRepo.save(new Transaction(userId, TransactionType.EXPENSE, "Bills", 4200.0, pastMonth.atDay(7), "Utilities"));
-            txRepo.save(new Transaction(userId, TransactionType.EXPENSE, "Travel", 3100.0, pastMonth.atDay(12), "Commute"));
-            txRepo.save(new Transaction(userId, TransactionType.EXPENSE, "Shopping", 6000.0, pastMonth.atDay(16), "Shopping"));
-            txRepo.save(new Transaction(userId, TransactionType.EXPENSE, "Entertainment", 2800.0, pastMonth.atDay(22), "Outings"));
+        // Where the extra income in each month came from
+        String[] extraIncomeCategory = { "Pocket money", "Freelancing", "", "Freelancing", "Pocket money" };
+        String[] extraIncomeNote = {
+            "Gift from family", "Freelance website project", "",
+            "Festive freelance bonus", "Gift from family"
+        };
+
+        for (int i = 0; i < pastMonths.length; i++) {
+            double[] row = pastMonths[i];
+
+            // Row 0 is the oldest month, so it goes back the furthest
+            int monthsAgo = pastMonths.length - i;
+            YearMonth month = thisMonth.minusMonths(monthsAgo);
+
+            // Monthly budget the user had set for that month
+            budgetRepo.save(new Budget(userId, month.toString(), row[9]));
+
+            // Income
+            save(userId, TransactionType.INCOME, "Salary", row[0], month.atDay(1), "Monthly salary - Tech Corp");
+            if (row[1] > 0) {
+                save(userId, TransactionType.INCOME, extraIncomeCategory[i], row[1], month.atDay(6), extraIncomeNote[i]);
+            }
+
+            // Expenses (a zero amount simply means that category was unused that month)
+            save(userId, TransactionType.EXPENSE, "Food",          row[2], month.atDay(4),  "Groceries & dining");
+            save(userId, TransactionType.EXPENSE, "Bills",         row[3], month.atDay(7),  "Electricity, water & broadband");
+            save(userId, TransactionType.EXPENSE, "Travel",        row[4], month.atDay(11), "Fuel, metro & cabs");
+            save(userId, TransactionType.EXPENSE, "Shopping",      row[5], month.atDay(15), "Clothing & household");
+            save(userId, TransactionType.EXPENSE, "Entertainment", row[6], month.atDay(19), "Movies & eating out");
+            save(userId, TransactionType.EXPENSE, "Education",     row[7], month.atDay(23), "Courses & books");
+            save(userId, TransactionType.EXPENSE, "Other",         row[8], month.atDay(26), "Gifts & miscellaneous");
         }
+
+        // ====================================================================
+        // 3. CURRENT MONTH (day by day, stopping at today)
+        // ====================================================================
+        budgetRepo.save(new Budget(userId, thisMonth.toString(), 42000.0));
+
+        // Income for this month
+        saveIfNotFuture(userId, today, TransactionType.INCOME, "Salary", 78000, 1, "Monthly salary - Tech Corp");
+        saveIfNotFuture(userId, today, TransactionType.INCOME, "Freelancing", 14500, 6, "Freelance project milestone");
+        saveIfNotFuture(userId, today, TransactionType.INCOME, "Other income", 2400, 17, "Cashback & interest credited");
+
+        // Expenses for this month, spread across the days of the month.
+        // Bigger fixed costs sit on the first few days, so the dashboard still
+        // looks active even when today is early in the month.
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Bills",         4450, 1,  "Electricity & broadband bill");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Food",          2850, 2,  "Monthly grocery run");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Travel",         780, 3,  "Metro card recharge");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Food",          1240, 5,  "Weekend dinner out");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Shopping",      3300, 6,  "Running shoes");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Entertainment",  920, 8,  "Movie tickets");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Food",          1680, 10, "Groceries top-up");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Travel",        1450, 12, "Cab rides & fuel");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Education",     2200, 14, "Online course subscription");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Shopping",      2750, 16, "Home essentials");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Food",          1520, 18, "Cafe & takeaway");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Entertainment", 1350, 20, "Concert tickets");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Bills",         1180, 22, "Mobile & OTT subscriptions");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Travel",         860, 24, "Auto & metro");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Food",          1960, 26, "Groceries");
+        saveIfNotFuture(userId, today, TransactionType.EXPENSE, "Other",         1100, 28, "Gifts & miscellaneous");
+    }
+
+    /**
+     * Saves one transaction. Amounts of zero are skipped so an unused
+     * category does not show up as a ₹0 row.
+     */
+    private void save(Long userId, TransactionType type, String category,
+                      double amount, LocalDate date, String description) {
+        if (amount <= 0) return;
+        txRepo.save(new Transaction(userId, type, category, amount, date, description));
+    }
+
+    /**
+     * Saves a transaction for the given day of THIS month, but only if that day
+     * has already happened. This keeps the demo free of future-dated money.
+     */
+    private void saveIfNotFuture(Long userId, LocalDate today, TransactionType type, String category,
+                                 double amount, int dayOfMonth, String description) {
+        // Skip days that have not arrived yet
+        if (dayOfMonth > today.getDayOfMonth()) return;
+
+        LocalDate date = YearMonth.from(today).atDay(dayOfMonth);
+        save(userId, type, category, amount, date, description);
     }
 }

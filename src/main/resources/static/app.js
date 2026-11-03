@@ -84,57 +84,140 @@ const ClientStore = {
       console.warn("localStorage quota exceeded", e);
     }
   },
+  /**
+   * Builds the sample Demo Account (Aarav Kumar) with facade data.
+   *
+   * All the numbers here are made-up placeholder values, used only so the
+   * dashboard, charts and reports look realistic when someone tries the demo.
+   *
+   * Two rules keep the demo believable:
+   *   1. Nothing is ever dated in the future (you cannot spend money tomorrow).
+   *   2. Every month has slightly different values, so the 6-month chart is not flat.
+   *
+   * These numbers mirror DemoDataLoader.java on the Spring Boot backend.
+   */
   init() {
-    if (!this.get("initialized", false)) {
-      const now = new Date();
-      const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    // Bump SEED_VERSION whenever the demo numbers below change, so returning
+    // visitors get the refreshed data instead of the old copy in localStorage.
+    const SEED_VERSION = 2;
+    if (this.get("seed_version", 0) === SEED_VERSION) return;
 
-      const users = [
-        { id: 1, email: "demo@rupeeflow.com", password: "password123", fullName: "Aarav Kumar" }
-      ];
+    const now = new Date();
+    const todayDay = now.getDate();
+    const monthKeyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const thisMonth = monthKeyOf(now);
 
-      const budgets = [
-        { userId: 1, month: thisMonth, amount: 35000 }
-      ];
+    const users = [
+      { id: 1, email: "demo@rupeeflow.com", password: "password123", fullName: "Aarav Kumar" }
+    ];
 
-      const goals = [
-        { userId: 1, title: "Emergency Fund & Laptop", targetAmount: 100000 }
-      ];
+    // Target is kept well above the demo's saved-up amount so the progress
+    // bar shows real partial progress (~65%) instead of sitting at 100%.
+    const goals = [
+      { userId: 1, title: "Emergency Fund & MacBook", targetAmount: 500000 }
+    ];
 
-      const transactions = [
-        { id: 1, userId: 1, type: "INCOME", category: "Salary", amount: 75000, occurredOn: `${thisMonth}-01`, description: "Tech Corp Monthly Salary" },
-        { id: 2, userId: 1, type: "INCOME", category: "Freelancing", amount: 15000, occurredOn: `${thisMonth}-05`, description: "Web Development Project" },
-        { id: 3, userId: 1, type: "EXPENSE", category: "Food", amount: 6800, occurredOn: `${thisMonth}-03`, description: "Groceries & Supermarket" },
-        { id: 4, userId: 1, type: "EXPENSE", category: "Bills", amount: 4500, occurredOn: `${thisMonth}-04`, description: "Electricity & High-speed Wifi" },
-        { id: 5, userId: 1, type: "EXPENSE", category: "Shopping", amount: 8200, occurredOn: `${thisMonth}-08`, description: "Clothing & Home Essentials" },
-        { id: 6, userId: 1, type: "EXPENSE", category: "Travel", amount: 3400, occurredOn: `${thisMonth}-11`, description: "Fuel & Metro Card" },
-        { id: 7, userId: 1, type: "EXPENSE", category: "Entertainment", amount: 2500, occurredOn: `${thisMonth}-14`, description: "Movies & Dinner with Friends" },
-        { id: 8, userId: 1, type: "EXPENSE", category: "Food", amount: 3200, occurredOn: `${thisMonth}-18`, description: "Weekend Cafe & Dining" },
-        { id: 9, userId: 1, type: "EXPENSE", category: "Education", amount: 2900, occurredOn: `${thisMonth}-20`, description: "Online Courses & Books" }
-      ];
+    const budgets = [];
+    const transactions = [];
+    let nextId = 1;
 
-      // Add past 5 months sample data
-      let idCounter = 10;
-      for (let i = 1; i <= 5; i++) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        budgets.push({ userId: 1, month: mKey, amount: 32000 });
-        transactions.push(
-          { id: idCounter++, userId: 1, type: "INCOME", category: "Salary", amount: 72000, occurredOn: `${mKey}-01`, description: "Monthly Salary" },
-          { id: idCounter++, userId: 1, type: "EXPENSE", category: "Food", amount: 7500, occurredOn: `${mKey}-04`, description: "Groceries" },
-          { id: idCounter++, userId: 1, type: "EXPENSE", category: "Bills", amount: 4200, occurredOn: `${mKey}-07`, description: "Utilities" },
-          { id: idCounter++, userId: 1, type: "EXPENSE", category: "Travel", amount: 3100, occurredOn: `${mKey}-12`, description: "Commute" },
-          { id: idCounter++, userId: 1, type: "EXPENSE", category: "Shopping", amount: 6000, occurredOn: `${mKey}-16`, description: "Shopping" },
-          { id: idCounter++, userId: 1, type: "EXPENSE", category: "Entertainment", amount: 2800, occurredOn: `${mKey}-22`, description: "Outings" }
-        );
+    const add = (type, category, amount, occurredOn, description) => {
+      // Skip empty amounts so an unused category never shows as a ₹0 row
+      if (!amount || amount <= 0) return;
+      transactions.push({ id: nextId++, userId: 1, type, category, amount, occurredOn, description });
+    };
+
+    const pad = (n) => String(n).padStart(2, "0");
+
+    // =================================================================
+    // 1. FIVE PAST MONTHS (gives the 6-month chart a varied history)
+    // =================================================================
+    // Column order:
+    // salary, extraIncome, food, bills, travel, shopping, fun, education, misc, budget
+    const pastMonths = [
+      [72000, 2000, 7200, 4100, 2800, 5400, 2100, 1800, 900, 38000],  // 5 months ago - steady
+      [72000, 8000, 8100, 4600, 3300, 7200, 3100, 2400, 0, 38000],    // 4 months ago - freelance project
+      [75000, 0, 6900, 5200, 2600, 4100, 1900, 0, 1200, 40000],       // 3 months ago - quiet month
+      [75000, 15500, 7800, 4300, 4100, 9600, 3600, 2000, 0, 35000],   // 2 months ago - festival overspend (fires 80% alert)
+      [78000, 1500, 7400, 4400, 2900, 5100, 2300, 2600, 1100, 42000]  // last month    - back to normal
+    ];
+
+    // Where the extra income in each month came from
+    const extraIncomeCategory = ["Pocket money", "Freelancing", "", "Freelancing", "Pocket money"];
+    const extraIncomeNote = [
+      "Gift from family", "Freelance website project", "",
+      "Festive freelance bonus", "Gift from family"
+    ];
+
+    pastMonths.forEach((row, i) => {
+      // Row 0 is the oldest month, so it goes back the furthest
+      const monthsAgo = pastMonths.length - i;
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1);
+      const mKey = monthKeyOf(monthDate);
+      const on = (day) => `${mKey}-${pad(day)}`;
+
+      // Monthly budget the user had set for that month
+      budgets.push({ userId: 1, month: mKey, amount: row[9] });
+
+      // Income
+      add("INCOME", "Salary", row[0], on(1), "Monthly salary - Tech Corp");
+      if (row[1] > 0) {
+        add("INCOME", extraIncomeCategory[i], row[1], on(6), extraIncomeNote[i]);
       }
 
-      this.set("users", users);
-      this.set("budgets", budgets);
-      this.set("goals", goals);
-      this.set("transactions", transactions);
-      this.set("initialized", true);
-    }
+      // Expenses (a zero amount simply means that category was unused that month)
+      add("EXPENSE", "Food", row[2], on(4), "Groceries & dining");
+      add("EXPENSE", "Bills", row[3], on(7), "Electricity, water & broadband");
+      add("EXPENSE", "Travel", row[4], on(11), "Fuel, metro & cabs");
+      add("EXPENSE", "Shopping", row[5], on(15), "Clothing & household");
+      add("EXPENSE", "Entertainment", row[6], on(19), "Movies & eating out");
+      add("EXPENSE", "Education", row[7], on(23), "Courses & books");
+      add("EXPENSE", "Other", row[8], on(26), "Gifts & miscellaneous");
+    });
+
+    // =================================================================
+    // 2. CURRENT MONTH (day by day, stopping at today)
+    // =================================================================
+    budgets.push({ userId: 1, month: thisMonth, amount: 42000 });
+
+    // Adds a transaction for a day of THIS month, but only if that day has
+    // already happened. This keeps the demo free of future-dated money.
+    const addIfNotFuture = (type, category, amount, day, description) => {
+      if (day > todayDay) return;
+      add(type, category, amount, `${thisMonth}-${pad(day)}`, description);
+    };
+
+    // Income for this month
+    addIfNotFuture("INCOME", "Salary", 78000, 1, "Monthly salary - Tech Corp");
+    addIfNotFuture("INCOME", "Freelancing", 14500, 6, "Freelance project milestone");
+    addIfNotFuture("INCOME", "Other income", 2400, 17, "Cashback & interest credited");
+
+    // Expenses for this month, spread across the days of the month.
+    // Bigger fixed costs sit on the first few days, so the dashboard still
+    // looks active even when today is early in the month.
+    addIfNotFuture("EXPENSE", "Bills", 4450, 1, "Electricity & broadband bill");
+    addIfNotFuture("EXPENSE", "Food", 2850, 2, "Monthly grocery run");
+    addIfNotFuture("EXPENSE", "Travel", 780, 3, "Metro card recharge");
+    addIfNotFuture("EXPENSE", "Food", 1240, 5, "Weekend dinner out");
+    addIfNotFuture("EXPENSE", "Shopping", 3300, 6, "Running shoes");
+    addIfNotFuture("EXPENSE", "Entertainment", 920, 8, "Movie tickets");
+    addIfNotFuture("EXPENSE", "Food", 1680, 10, "Groceries top-up");
+    addIfNotFuture("EXPENSE", "Travel", 1450, 12, "Cab rides & fuel");
+    addIfNotFuture("EXPENSE", "Education", 2200, 14, "Online course subscription");
+    addIfNotFuture("EXPENSE", "Shopping", 2750, 16, "Home essentials");
+    addIfNotFuture("EXPENSE", "Food", 1520, 18, "Cafe & takeaway");
+    addIfNotFuture("EXPENSE", "Entertainment", 1350, 20, "Concert tickets");
+    addIfNotFuture("EXPENSE", "Bills", 1180, 22, "Mobile & OTT subscriptions");
+    addIfNotFuture("EXPENSE", "Travel", 860, 24, "Auto & metro");
+    addIfNotFuture("EXPENSE", "Food", 1960, 26, "Groceries");
+    addIfNotFuture("EXPENSE", "Other", 1100, 28, "Gifts & miscellaneous");
+
+    this.set("users", users);
+    this.set("budgets", budgets);
+    this.set("goals", goals);
+    this.set("transactions", transactions);
+    this.set("initialized", true);
+    this.set("seed_version", SEED_VERSION);
   }
 };
 
